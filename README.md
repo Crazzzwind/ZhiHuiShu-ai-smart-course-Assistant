@@ -144,5 +144,3 @@ URL = ("https://ai-smart-course-student-pro.zhihuishu.com/"
 **如果这个项目对你有帮助，欢迎点个 Star**
 
 </div>
-
-> （注：部分内容由豆包 AI 生成）
