@@ -131,7 +131,7 @@ URL = ("https://ai-smart-course-student-pro.zhihuishu.com/"
 
 希望这个小小的项目能帮到你 QwQ
 
----
+PS：隔壁这个虽然不支持ai课程 但是很？！强强？！https://github.com/CXRunfree/Autovisor/
 
 ## 免责声明
 
