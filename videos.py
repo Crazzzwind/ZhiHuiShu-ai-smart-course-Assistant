@@ -8,8 +8,8 @@ import random
 import re
 
 URL = ("https://ai-smart-course-student-pro.zhihuishu.com/"
-       "singleCourse/knowledgeStudy/2091402990853783552/257092"
-       "?mapUid=1878632308530089984")
+       "singleCourse/knowledgeStudy/新课程ID/新章节ID"
+       "?mapUid=新的mapUid")
 #把你的课程链接输在这里(如果不懂py的就按照这个格式填一下吧)
 
 # --- 章节进度阈值：进度小于该值就处理（原来是只处理 0% 的章节）---
