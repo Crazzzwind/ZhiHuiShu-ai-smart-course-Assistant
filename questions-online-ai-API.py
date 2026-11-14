@@ -22,7 +22,6 @@ except Exception:
 URL = ("https://ai-smart-course-student-pro.zhihuishu.com/"
        "singleCourse/knowledgeStudy/新课程ID/新章节ID"
        "?mapUid=新的mapUid")
-
 # --- 章节进度 ---
 SEL_PROGRESS_TEXT   = ".el-progress__text"
 SEL_PROGRESS_SPAN   = "span"
@@ -63,9 +62,9 @@ SEL_SUBMIT_BTN       = ".reviewDone.ZHIHUISHU_QZMD"
 SEL_MESSAGE          = "p.el-message__content"
 
 # --- ChatAnywhere 云端 API ---
-CHATANYWHERE_API_KEY  = "sk-你的Key"                              # ★ 必改
-CHATANYWHERE_BASE_URL = "https://xxxx.com"                        # ★ 必改
-CHATANYWHERE_MODEL    = "xxxx"                                   # ★ 必改
+CHATANYWHERE_API_KEY  = "sk-key"                              # ★ 必改
+CHATANYWHERE_BASE_URL = "https://xxxx.com"                       # ★ 必改
+CHATANYWHERE_MODEL    = "xxxx"                              # ★ 必改
 AI_TEMPERATURE        = 0
 AI_RETRY              = 2
 AI_TIMEOUT            = 60                                        # 秒
@@ -390,6 +389,10 @@ def ask_ai_vote(question_type, stem, options=None, blank_count=None, n_samples=V
         print(f"[VOTE] 第{k+1}/{n_samples}次 {question_type}: {ans}")
         if ans:
             runs.append(ans)
+        # 提前终止：前两次答案完全一样就不再投第 3 次（学 pp.py 的写法）
+        if len(runs) >= 2 and runs[-1] == runs[-2] and k + 1 < n_samples:
+            print("[VOTE OPT] 前两次结果一致，跳过剩余采样，不再调用模型")
+            break
 
     if not runs:
         return {"answers": []}

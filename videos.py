@@ -5,11 +5,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import random
+import re
 
 URL = ("https://ai-smart-course-student-pro.zhihuishu.com/"
-       "singleCourse/knowledgeStudy/新课程ID/新章节ID"
-       "?mapUid=新的mapUid")
+       "singleCourse/knowledgeStudy/2091402990853783552/257092"
+       "?mapUid=1878632308530089984")
 #把你的课程链接输在这里(如果不懂py的就按照这个格式填一下吧)
+
+# --- 章节进度阈值：进度小于该值就处理（原来是只处理 0% 的章节）---
+PROGRESS_THRESHOLD = 100
+SEL_PROGRESS_NUM = ".pct-num"
 
 options = Options()
 options.add_argument("--start-maximized")
@@ -70,17 +75,65 @@ def summarize_remaining(boxes):
     return remaining, summary
 
 
-def get_zero_chapters():
+def _parse_pct(text, style):
+    """把 style 里的 width:x% 或文本里的 x% / 纯数字解析成百分比，取不到返回 None"""
+    m = re.search(r"width\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%", (style or "").replace(" ", ""))
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+
+    txt = (text or "").strip()
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", txt)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+
+    m = re.search(r"[0-9]+(?:\.[0-9]+)?", txt)
+    if m:
+        try:
+            return float(m.group(0))
+        except ValueError:
+            pass
+    return None
+
+
+def log_progress_samples(limit=20):
+    """调试用：打印左列进度文本样本，确认选择器确实取到了进度"""
+    try:
+        texts = driver.execute_script("""
+            return [...document.querySelectorAll(arguments[0])].map(p => {
+                const s = p.querySelector ? p.querySelector('span') : null;
+                return ((s ? s.textContent : p.textContent) || '').trim();
+            }).slice(0, arguments[1]);
+        """, SEL_PROGRESS_NUM, limit)
+        print(f"[DEBUG] 进度文本样本(前{limit}): {texts}")
+    except Exception as e:
+        print(f"[DEBUG WARN] 进度文本读取失败: {type(e).__name__}: {e}")
+
+
+def get_low_progress_chapters():
+    """收集进度 < PROGRESS_THRESHOLD 的章节（原来是只认 style 里的 width:0%）"""
     result = []
     try:
-        pcts = driver.find_elements(By.CSS_SELECTOR, ".pct-num")
+        pcts = driver.find_elements(By.CSS_SELECTOR, SEL_PROGRESS_NUM)
     except Exception:
         return result
 
     for pct in pcts:
         try:
-            style = (pct.get_attribute("style") or "").replace(" ", "")
-            if "width:0%" not in style:
+            style = pct.get_attribute("style") or ""
+            text = driver.execute_script("""
+                const p = arguments[0];
+                const s = p.querySelector ? p.querySelector('span') : null;
+                return ((s ? s.textContent : p.textContent) || '').trim();
+            """, pct) or ""
+
+            num = _parse_pct(text, style)
+            if num is None or num >= PROGRESS_THRESHOLD:
                 continue
 
             title = driver.execute_script("""
@@ -106,7 +159,7 @@ def get_zero_chapters():
             if click_el is None:
                 continue
 
-            result.append((title, click_el))
+            result.append((title, click_el, num, text))
         except Exception:
             continue
     return result
@@ -261,17 +314,30 @@ try:
             break
         time.sleep(3)
 
-        zero_list = get_zero_chapters()
-        remaining_titles = [(t, el) for t, el in zero_list if t not in tried_titles]
-        print(f"\n[OUTER] 当前 0% 章节 {len(zero_list)} 个，其中未尝试 {len(remaining_titles)} 个")
-
-        if not remaining_titles:
-            print("[OK] 所有 0% 章节都已尝试，结束")
+        try:
+            total_pct = len(driver.find_elements(By.CSS_SELECTOR, SEL_PROGRESS_NUM))
+        except Exception:
+            total_pct = -1
+        if total_pct == 0:
+            print(f"[WARN] 未找到进度元素 {SEL_PROGRESS_NUM}，选择器可能失效，退出外层")
             break
 
-        chapter_title, chapter_el = remaining_titles[0]
+        low_list = get_low_progress_chapters()
+        if chapter_count == 0:
+            log_progress_samples()
+        remaining_titles = [(t, el, p, raw) for t, el, p, raw in low_list
+                            if t not in tried_titles]
+        print(f"\n[OUTER] 进度<{PROGRESS_THRESHOLD}% 章节 {len(low_list)} 个"
+              f"（进度元素 {total_pct} 个），其中未尝试 {len(remaining_titles)} 个")
+
+        if not remaining_titles:
+            print(f"[OK] 所有进度<{PROGRESS_THRESHOLD}% 的章节都已尝试，结束")
+            break
+
+        chapter_title, chapter_el, chapter_progress, chapter_raw = remaining_titles[0]
         chapter_count += 1
-        print(f"\n[CHAPTER {chapter_count}/{MAX_CHAPTERS}] 处理: {chapter_title}")
+        print(f"\n[CHAPTER {chapter_count}/{MAX_CHAPTERS}] 处理: {chapter_title} "
+              f"(进度={chapter_progress} 原文='{chapter_raw}')")
 
         try:
             chapter_el.click()

@@ -356,6 +356,10 @@ def ask_ollama_vote(question_type, stem, options=None, blank_count=None, n_sampl
         print(f"[VOTE] 第{k+1}/{n_samples}次 {question_type}: {ans}")
         if ans:
             runs.append(ans)
+        # 提前终止：前两次答案完全一样就不再投第 3 次（学 pp.py 的写法）
+        if len(runs) >= 2 and runs[-1] == runs[-2] and k + 1 < n_samples:
+            print("[VOTE OPT] 前两次结果一致，跳过剩余采样，不再调用模型")
+            break
 
     if not runs:
         return {"answers": []}
